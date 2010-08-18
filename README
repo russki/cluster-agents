@@ -1,0 +1,6 @@
+These are the additional OCF startup scripts for cluster-agents-1.0.3 package in backports of Debian 5.0 ( Lenny )
+
+Just put them into /usr/lib/ocf/resource.d/heartbeat folder
+
+Example to configure:
+crm configure primitive haproxy ocf:heartbeat:haproxy params conffile=/etc/haproxy/haproxy.cfg op monitor interval=1min
