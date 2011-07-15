@@ -5,7 +5,8 @@
 # Description:  Manages haproxy daemon as an OCF resource in 
 #               an High Availability setup.
 #
-# Author: Dhairesh Oza <odhairesh@novell.com>
+# HAProxy OCF script's Author: Russki
+# Rsync OCF script's Author: Dhairesh Oza <odhairesh@novell.com>
 # License: GNU General Public License (GPL) 
 #
 #
