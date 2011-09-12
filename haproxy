@@ -19,6 +19,7 @@
 # OCF parameters:
 # OCF_RESKEY_binpath
 # OCF_RESKEY_conffile
+# OCF_RESKEY_extraconf
 #
 # Note:This RA requires that the haproxy config files has a "pid file" 
 # entry so that it is able to act on the correct process
@@ -67,6 +68,15 @@ For example, "/etc/haproxy/haproxy.cfg"
 </longdesc>
 <shortdesc lang="en">Configuration file name with full path</shortdesc>
 <content type="string" default="/etc/haproxy/haproxy.cfg" />
+</parameter>
+
+<parameter name="extraconf">
+<longdesc lang="en">
+Extra command line arguments to pass to haproxy. 
+For example, "-f /etc/haproxy/shared.cfg"
+</longdesc>
+<shortdesc lang="en">Extra command line arguments for haproxy</shortdesc>
+<content type="string" default="" />
 </parameter>
 
 </parameters>
@@ -136,7 +146,7 @@ haproxy_start()
 		COMMAND="/usr/sbin/haproxy"
 	fi
 
-	$COMMAND -f $CONF_FILE -p $PIDFILE;
+	$COMMAND $OCF_RESKEY_extraconf -f $CONF_FILE -p $PIDFILE;
 	if [ $? -ne 0 ]; then
 		ocf_log err "Error. haproxy daemon returned error $?."
 		exit $OCF_ERR_GENERIC
