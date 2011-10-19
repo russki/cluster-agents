@@ -1,0 +1,249 @@
+#!/bin/sh
+#
+# Resource script for generic_daemon daemon
+#
+# Description:  Manages generic_daemon daemon as an OCF resource in
+#               an High Availability setup.
+#
+# HAProxy OCF script's Author: Russki
+# Rsync OCF script's Author: Dhairesh Oza <odhairesh@novell.com>
+# License: GNU General Public License (GPL)
+#
+#
+#	usage: $0 {start|stop|status|monitor|validate-all|meta-data}
+#
+#	The "start" arg starts generic_daemon.
+#
+#	The "stop" arg stops it.
+#
+# OCF parameters:
+# OCF_RESKEY_name
+# OCF_RESKEY_initd
+# OCF_RESKEY_pidfile
+#
+# Note:This RA requires that the generic_daemon config files has a "pidfile"
+# entry so that it is able to act on the correct process
+##########################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/resource.d/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/.ocf-shellfuncs
+
+USAGE="Usage: $0 {start|stop|status|monitor|validate-all|meta-data}";
+
+##########################################################################
+
+usage()
+{
+	echo $USAGE >&2
+}
+
+meta_data()
+{
+cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="generic_daemon">
+<version>1.0</version>
+<longdesc lang="en">
+This script manages generic_daemon daemon
+</longdesc>
+<shortdesc lang="en">Manages an generic_daemon daemon</shortdesc>
+
+<parameters>
+
+<parameter name="name">
+<longdesc lang="en">
+The name of the daemon
+For example, "generic_daemon" will be used in 
+init script "/etc/init.d/generic_daemon" and pidfile
+"/var/run/generic_daemon.pid"
+</longdesc>
+<shortdesc lang="en">Name of the daemon we will be managing</shortdesc>
+<content type="string" default=""/>
+</parameter>
+
+<parameter name="initd">
+<longdesc lang="en">
+The generic_daemon init script's path.
+For example, "/etc/init.d/generic_daemon"
+If it's not supplied, it will be set to "/etc/init.d/$OCF_RESKEY_name"
+</longdesc>
+<shortdesc lang="en">Full path to the generic_daemon init script</shortdesc>
+<content type="string" default="/etc/init.d/${OCF_RESKEY_name}"/>
+</parameter>
+
+<parameter name="pidfile">
+<longdesc lang="en">
+The generic_daemon daemon pid file name with full path if it's different
+For example, "/var/run/generic_daemon.pid"
+If it's not supplied, it will be set to "/var/run/$OCF_RESKEY_name"
+</longdesc>
+<shortdesc lang="en">Full path to the generic_daemon PID file</shortdesc>
+<content type="string" default="/var/run/${OCF_RESKEY_name}.pid" />
+</parameter>
+
+</parameters>
+
+<actions>
+<action name="start" timeout="20s"/>
+<action name="stop" timeout="20s"/>
+<action name="monitor" depth="0" timeout="20s" interval="60s" />
+<action name="validate-all" timeout="20s"/>
+<action name="meta-data"  timeout="5s"/>
+</actions>
+</resource-agent>
+END
+exit $OCF_SUCCESS
+}
+
+get_params()
+{
+	if [ -n "$OCF_RESKEY_initd" ]; then
+		INITD=${OCF_RESKEY_initd}
+	else
+		INITD="/etc/init.d/${OCF_RESKEY_name}"
+	fi
+	if [ -n "$OCF_RESKEY_pidfile" ]; then
+		PIDFILE=${OCF_RESKEY_pidfile}
+	else
+		PIDFILE="/var/run/${OCF_RESKEY_name}.pid"
+	fi
+}
+
+generic_daemon_status()
+{
+	if [ -n "$PIDFILE" -a -f $PIDFILE ]; then
+		# generic_daemon is probably running
+		PID=`cat $PIDFILE`
+		if [ -n "$PID" ]; then
+			if ps -p $PID | grep $OCF_RESKEY_name >/dev/null ; then
+				ocf_log info "$OCF_RESKEY_name daemon running"
+				return $OCF_SUCCESS
+			else
+				ocf_log info "$OCF_RESKEY_name daemon is not running but pid file exists"
+				return $OCF_NOT_RUNNING
+			fi
+		else
+			ocf_log err "PID file empty!"
+			return $OCF_ERR_GENERIC
+		fi
+	fi
+
+	# generic_daemon is not running
+	ocf_log info "$OCF_RESKEY_name daemon is not running"
+	return $OCF_NOT_RUNNING
+}
+
+generic_daemon_start()
+{
+	# if generic_daemon is running return success
+	generic_daemon_status
+	retVal=$?
+	if [ $retVal -eq $OCF_SUCCESS ]; then
+		exit $OCF_SUCCESS
+	elif [ $retVal -ne $OCF_NOT_RUNNING ]; then
+		ocf_log err "Error. Unknown status."
+		exit $OCF_ERR_GENERIC
+	fi
+
+	if [ -n "$INITD" ]; then
+		COMMAND=$INITD
+	else
+		ocf_log err "Error. Init script is unknown."
+		exit $OCF_ERR_GENERIC
+	fi
+
+	$COMMAND start
+	if [ $? -ne 0 ]; then
+		ocf_log err "Error. $OCF_RESKEY_name daemon returned error $?."
+		exit $OCF_ERR_GENERIC
+	fi
+
+	ocf_log info "Started $OCF_RESKEY_name daemon."
+	exit $OCF_SUCCESS
+}
+
+
+generic_daemon_stop()
+{
+	if generic_daemon_status ; then
+		PID=`cat $PIDFILE`
+		if [ -n "$PID" ] ; then
+			kill $PID
+			if [ $? -ne 0 ]; then
+				kill -SIGKILL $PID
+				if [ $? -ne 0 ]; then
+					ocf_log err "Error. Could not stop $OCF_RESKEY_name daemon."
+					return $OCF_ERR_GENERIC
+				fi
+			fi
+			rm $PIDFILE 2>/dev/null
+		fi
+	fi
+	ocf_log info "Stopped $OCF_RESKEY_name daemon."
+	exit $OCF_SUCCESS
+}
+
+generic_daemon_monitor()
+{
+	generic_daemon_status
+}
+
+generic_daemon_validate_all()
+{
+	if [ -n "$INITD" -a ! -x "$INITD" ]; then
+		ocf_log err "Binary path $INITD does not exist."
+		exit $OCF_ERR_ARGS
+	fi
+	if [ -n "$PIDFILE" -a ! -f "$PIDFILE" ]; then
+		ocf_log err "Config file $PIDFILE does not exist."
+		exit $OCF_ERR_ARGS
+	fi
+
+	return $OCF_SUCCESS
+}
+
+
+#
+# Main
+#
+
+if [ $# -ne 1 ]; then
+	usage
+	exit $OCF_ERR_ARGS
+fi
+
+case $1 in
+	start)	get_params
+		generic_daemon_start
+		;;
+
+	stop)	get_params
+		generic_daemon_stop
+		;;
+
+	status)	get_params
+		generic_daemon_status
+		;;
+
+	monitor)get_params
+		generic_daemon_monitor
+		;;
+
+	validate-all)	get_params
+			generic_daemon_validate_all
+			;;
+
+	meta-data)	meta_data
+			;;
+
+	usage)	usage
+		exit $OCF_SUCCESS
+		;;
+
+	*)	usage
+		exit $OCF_ERR_UNIMPLEMENTED
+		;;
+esac
+
