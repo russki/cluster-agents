@@ -117,7 +117,7 @@ generic_daemon_status()
 		# generic_daemon is probably running
 		PID=`cat $PIDFILE`
 		if [ -n "$PID" ]; then
-			if ps -p $PID | grep $OCF_RESKEY_name >/dev/null ; then
+			if ps -F -p $PID | grep $OCF_RESKEY_name >/dev/null ; then
 				ocf_log info "$OCF_RESKEY_name daemon running"
 				return $OCF_SUCCESS
 			else
