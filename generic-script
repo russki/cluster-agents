@@ -10,7 +10,7 @@
 # License: GNU General Public License (GPL)
 #
 #
-#	usage: $0 {start|stop|status|monitor|validate-all|meta-data}
+#	usage: $0 {start|stop|monitor|validate-all|meta-data}
 #
 #	The "start" arg starts generic-script.
 #
@@ -20,6 +20,7 @@
 # OCF_RESKEY_script
 # OCF_RESKEY_startargs
 # OCF_RESKEY_stopargs
+# OCF_RESKEY_startandstop
 #
 ##########################################################################
 # Initialization:
@@ -27,7 +28,7 @@
 : ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/resource.d/heartbeat}
 . ${OCF_FUNCTIONS_DIR}/.ocf-shellfuncs
 
-USAGE="Usage: $0 {start|stop|status|monitor|validate-all|meta-data}";
+USAGE="Usage: $0 {start|stop|monitor|validate-all|meta-data}";
 
 ##########################################################################
 
@@ -79,6 +80,16 @@ If it's not supplied, it will be set to nothing
 <content type="string" default=""/>
 </parameter>
 
+<parameter name="startandstop">
+<longdesc lang="en">
+The generic-script will only execute on start by default
+If startandstop is set to "1", or stopargs is set, the script
+will be executed when service is stopped as well
+</longdesc>
+<shortdesc lang="en">Whether we execute the script when stopping the resource</shortdesc>
+<content type="string" default=""/>
+</parameter>
+
 </parameters>
 
 <actions>
@@ -97,6 +108,9 @@ get_params()
 {
 	if [ -n "$OCF_RESKEY_script" ]; then
 		SCRIPT=${OCF_RESKEY_script}
+	else
+		ocf_log info "You need to specify which script to run"
+		return $OCF_ERR_ARGS
 	fi
 	if [ -n "$OCF_RESKEY_startargs" ]; then
 		STARTARG=${OCF_RESKEY_startargs}
@@ -104,18 +118,26 @@ get_params()
 	if [ -n "$OCF_RESKEY_stopargs" ]; then
 		STOPARG=${OCF_RESKEY_stopargs}
 	fi
+	if [ -n "$OCF_RESKEY_startandstop" ]; then
+		STARTANDSTOP=${OCF_RESKEY_startandstop}
+	fi
+	echo "Going to do $SCRIPT $STARTARG $STOPARG $STARTANDSTOP " >> /tmp/params.txt
 }
 
-generic_script_status()
+generic_script_monitor()
 {
-#	# let's see if the file is there and executable
-#	if [ -x $SCRIPT ]; then
-#		# well there's really nothing else to do, let's return success
-#		return $OCF_SUCCESS
-#	else
-#		ocf_log info "$SCRIPT is does not exist or isn't executable"
-#		return $OCF_NOT_RUNNING
-#	fi
+	echo "POOP and $SCRIPT and $STARTARG and $STOPARG" >> /tmp/monitor.txt
+	# let's see if the file is there and executable
+	if [ -n $SCRIPT ]; then
+		# well there's really nothing else to do, let's return success
+		echo "MONITOR INSIDE IF and $SCRIPT and $STARTARG and $STOPARG" >> /tmp/monitor.txt
+		return $OCF_SUCCESS
+	else
+		# file is not there, let's return an error
+		echo "MONITOR INSIDE ELSE and $SCRIPT and $STARTARG and $STOPARG" >> /tmp/monitor.txt
+		ocf_log info "$SCRIPT is does not exist or isn't executable"
+		return $OCF_ERR_ARGS
+	fi
 
 	# generic_daemon is not running
 	ocf_log info "$OCF_RESKEY_name script is not running"
@@ -125,6 +147,7 @@ generic_script_status()
 
 generic_script_start()
 {
+	echo "1) Going to do $COMMAND $STARTARG " >> /tmp/start.txt
 	# check if the script is there
 	generic_script_status
 	retVal=$?
@@ -133,15 +156,15 @@ generic_script_start()
 		exit $OCF_ERR_GENERIC
 	fi
 
-	if [ -n "$SCRIPT" ]; then
+	if [ -x "$SCRIPT" ]; then
 		COMMAND=$SCRIPT
 	else
 		ocf_log err "Error. Script is unknown."
 		exit $OCF_ERR_GENERIC
 	fi
 
-	echo "Going to do $COMMAND $STARTARG " >> /tmp/${SCRIPT}-start
-	$COMMAND $STARTARG
+	echo "2) Going to do $COMMAND $STARTARG " >> /tmp/start.txt
+	$($COMMAND $STARTARG)
 	if [ $? -ne 0 ]; then
 		ocf_log err "Error. $OCF_RESKEY_name script returned error $?."
 		exit $OCF_ERR_GENERIC
@@ -162,15 +185,21 @@ generic_script_stop()
 		exit $OCF_ERR_GENERIC
 	fi
 
-	if [ -n "$SCRIPT" ]; then
+	if [ -x "$SCRIPT" ]; then
 		COMMAND=$SCRIPT
 	else
 		ocf_log err "Error. Script is unknown."
 		exit $OCF_ERR_GENERIC
 	fi
 
-	echo "Going to do $COMMAND $STOPARG " >> /tmp/${SCRIPT}-stop
-	$COMMAND $STOPARG
+	echo "Check if we should be stopping $COMMAND $STOPARG " >> /tmp/stop.txt
+	# If both of these are not present, we're not supposed to run
+	if [[ -z $STARTANDSTOP && -z $STOPARG ]]; then
+		exit $OCF_SUCCESS
+	fi
+	echo "Inside Stop Going to do $COMMAND $STOPARG " >> /tmp/stop.txt
+
+	${$COMMAND $STOPARG}
 	if [ $? -ne 0 ]; then
 		ocf_log err "Error. $OCF_RESKEY_name script returned error $?."
 		exit $OCF_ERR_GENERIC
@@ -180,14 +209,10 @@ generic_script_stop()
 	exit $OCF_SUCCESS
 }
 
-generic_script_monitor()
-{
-	generic_script_status
-}
-
 generic_script_validate_all()
 {
-	if [ -n "$SCRIPT" -a ! -x "$SCRIPT" ]; then
+	echo "BALLS" >> /tmp/validate.txt
+	if [ ! -n "$SCRIPT" -a ! -x "$SCRIPT" ]; then
 		ocf_log err "Binary path to script $SCRIPT does not exist."
 		exit $OCF_ERR_ARGS
 	fi
@@ -206,23 +231,23 @@ if [ $# -ne 1 ]; then
 fi
 
 case $1 in
-	start)	get_params
+	start)	echo POOP >>/tmp/start.txt
+		get_params
 		generic_script_start
 		;;
 
-	stop)	get_params
+	stop)	echo POOP >>/tmp/stop.txt
+		get_params
 		generic_script_stop
 		;;
 
-	status)	get_params
-		generic_script_status
-		;;
-
-	monitor)get_params
+	monitor)echo POOP >>/tmp/monitor.txt
+		get_params
 		generic_script_monitor
 		;;
 
-	validate-all)	get_params
+	validate-all)	echo POOP >>/tmp/validate.txt
+			get_params
 			generic_script_validate_all
 			;;
 
