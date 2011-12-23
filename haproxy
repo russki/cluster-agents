@@ -98,7 +98,7 @@ get_pid_and_conf_file()
 	if [ -n "$OCF_RESKEY_conffile" ]; then
 		CONF_FILE=$OCF_RESKEY_conffile
 	else
-		CONF_FILE="/etc/haproxy/haproxy.conf"
+		CONF_FILE="/etc/haproxy/haproxy.cfg"
 	fi
 
 	PIDFILE="`grep -v \"#\" ${CONF_FILE} | grep \"pidfile\" | sed 's/^[ \t]*pidfile[ \t]*//'`"
