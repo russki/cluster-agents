@@ -121,20 +121,20 @@ get_params()
 	if [ -n "$OCF_RESKEY_startandstop" ]; then
 		STARTANDSTOP=${OCF_RESKEY_startandstop}
 	fi
-	echo "Going to do $SCRIPT $STARTARG $STOPARG $STARTANDSTOP " >> /tmp/params.txt
+	#echo "Going to do $SCRIPT $STARTARG $STOPARG $STARTANDSTOP " >> /tmp/params.txt
 }
 
 generic_script_monitor()
 {
-	echo "POOP and $SCRIPT and $STARTARG and $STOPARG" >> /tmp/monitor.txt
+	#echo "POOP and $SCRIPT and $STARTARG and $STOPARG" >> /tmp/monitor.txt
 	# let's see if the file is there and executable
 	if [ -n $SCRIPT ]; then
 		# well there's really nothing else to do, let's return success
-		echo "MONITOR INSIDE IF and $SCRIPT and $STARTARG and $STOPARG" >> /tmp/monitor.txt
+		#echo "MONITOR INSIDE IF and $SCRIPT and $STARTARG and $STOPARG" >> /tmp/monitor.txt
 		return $OCF_SUCCESS
 	else
 		# file is not there, let's return an error
-		echo "MONITOR INSIDE ELSE and $SCRIPT and $STARTARG and $STOPARG" >> /tmp/monitor.txt
+		#echo "MONITOR INSIDE ELSE and $SCRIPT and $STARTARG and $STOPARG" >> /tmp/monitor.txt
 		ocf_log info "$SCRIPT is does not exist or isn't executable"
 		return $OCF_ERR_ARGS
 	fi
@@ -147,7 +147,7 @@ generic_script_monitor()
 
 generic_script_start()
 {
-	echo "1) Going to do $COMMAND $STARTARG " >> /tmp/start.txt
+	#echo "1) Going to do $COMMAND $STARTARG " >> /tmp/start.txt
 	# check if the script is there
 	generic_script_status
 	retVal=$?
@@ -163,7 +163,7 @@ generic_script_start()
 		exit $OCF_ERR_GENERIC
 	fi
 
-	echo "2) Going to do $COMMAND $STARTARG " >> /tmp/start.txt
+	#echo "2) Going to do $COMMAND $STARTARG " >> /tmp/start.txt
 	$($COMMAND $STARTARG)
 	if [ $? -ne 0 ]; then
 		ocf_log err "Error. $OCF_RESKEY_name script returned error $?."
@@ -192,12 +192,12 @@ generic_script_stop()
 		exit $OCF_ERR_GENERIC
 	fi
 
-	echo "Check if we should be stopping $COMMAND $STOPARG " >> /tmp/stop.txt
+	#echo "Check if we should be stopping $COMMAND $STOPARG " >> /tmp/stop.txt
 	# If both of these are not present, we're not supposed to run
 	if [[ -z $STARTANDSTOP && -z $STOPARG ]]; then
 		exit $OCF_SUCCESS
 	fi
-	echo "Inside Stop Going to do $COMMAND $STOPARG " >> /tmp/stop.txt
+	#echo "Inside Stop Going to do $COMMAND $STOPARG " >> /tmp/stop.txt
 
 	${$COMMAND $STOPARG}
 	if [ $? -ne 0 ]; then
@@ -211,7 +211,6 @@ generic_script_stop()
 
 generic_script_validate_all()
 {
-	echo "BALLS" >> /tmp/validate.txt
 	if [ ! -n "$SCRIPT" -a ! -x "$SCRIPT" ]; then
 		ocf_log err "Binary path to script $SCRIPT does not exist."
 		exit $OCF_ERR_ARGS
@@ -231,23 +230,19 @@ if [ $# -ne 1 ]; then
 fi
 
 case $1 in
-	start)	echo POOP >>/tmp/start.txt
-		get_params
+	start)	get_params
 		generic_script_start
 		;;
 
-	stop)	echo POOP >>/tmp/stop.txt
-		get_params
+	stop)	get_params
 		generic_script_stop
 		;;
 
-	monitor)echo POOP >>/tmp/monitor.txt
-		get_params
+	monitor)get_params
 		generic_script_monitor
 		;;
 
-	validate-all)	echo POOP >>/tmp/validate.txt
-			get_params
+	validate-all)	get_params
 			generic_script_validate_all
 			;;
 
