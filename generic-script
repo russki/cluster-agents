@@ -21,6 +21,9 @@
 # OCF_RESKEY_startargs
 # OCF_RESKEY_stopargs
 # OCF_RESKEY_startandstop
+# OCF_RESKEY_args
+# OCF_RESKEY_statedir
+# OCF_RESKEY_alwaysrun
 #
 ##########################################################################
 # Initialization:
@@ -90,6 +93,32 @@ will be executed when service is stopped as well
 <content type="string" default=""/>
 </parameter>
 
+<parameter name="args">
+<longdesc lang="en">
+Args that will be executed all the time if you do not need start and stop ones
+</longdesc>
+<shortdesc lang="en">Arguments that we will run all the time</shortdesc>
+<content type="string" default=""/>
+</parameter>
+
+<parameter name="statedir">
+<longdesc lang="en">
+You can specify where the state directory will live
+Useful if you want it to be in /dev/shm
+</longdesc>
+<shortdesc lang="en">Where the state directory is</shortdesc>
+<content type="string" default=""/>
+</parameter>
+
+<parameter name="alwaysrun">
+<longdesc lang="en">
+The command will be executed all the time in monitor stage
+Useful if you want this to be a healthcheck, goes nicely if you write state to /dev/shm
+</longdesc>
+<shortdesc lang="en">If you want this to run every time monitor runs</shortdesc>
+<content type="string" default=""/>
+</parameter>
+
 </parameters>
 
 <actions>
@@ -121,14 +150,27 @@ get_params()
 	if [ -n "$OCF_RESKEY_startandstop" ]; then
 		STARTANDSTOP=${OCF_RESKEY_startandstop}
 	fi
+	if [ -n "$OCF_RESKEY_args" ]; then
+		ARGS=${OCF_RESKEY_args}
+	fi
+	if [ -n "$OCF_RESKEY_alwaysrun" ]; then
+		ALWAYSRUN=${OCF_RESKEY_alwaysrun}
+	fi
 	#echo "Going to do $SCRIPT $STARTARG $STOPARG $STARTANDSTOP " >> /tmp/params.txt
 }
 
 generic_script_monitor()
 {
-	#echo "POOP and $SCRIPT and $STARTARG and $STOPARG" >> /tmp/monitor.txt
-	echo ${OCF_RESKEY_state}
+	#echo "POOP and $SCRIPT and $STARTARG and $STOPARG and $ARGS and $OCF_RESKEY_state" >> /tmp/monitor.txt
 	if [ -f ${OCF_RESKEY_state} ]; then
+		if [ -n ${ALWAYSRUN} ]; then
+			$($SCRIPT $ARGS >/dev/null 2>&1)
+			if [ $? -ne 0 ]; then
+				#echo "SHIT FUCK IT FAILED" >> /tmp/monitor.txt
+				ocf_log err "Error. $OCF_RESKEY_name script returned error $?."
+				return $OCF_ERR_GENERIC
+			fi
+		fi
 		return $OCF_SUCCESS
 	fi
 	if false ; then
@@ -153,7 +195,8 @@ generic_script_start()
 	retVal=$?
 	if [ $retVal -eq $OCF_NOT_RUNNING ]; then
 		#echo "2) Going to do $COMMAND $STARTARG " >> /tmp/start.txt
-		$($COMMAND $STARTARG)
+		$($COMMAND ${STARTARGS:-$ARGS} >/dev/null 2>&1)
+		#echo $COMMAND ${STARTARGS:-$ARGS} >> /tmp/start.txt
 		if [ $? -ne 0 ]; then
 			ocf_log err "Error. $OCF_RESKEY_name script returned error $?."
 			exit $OCF_ERR_GENERIC
@@ -196,7 +239,8 @@ generic_script_stop()
 			rm -f ${OCF_RESKEY_state}
 			exit $OCF_SUCCESS
 		fi
-		$($COMMAND $STOPARG)
+		$($COMMAND ${STOPARGS:-$ARGS} >/dev/null 2>&1)
+		#echo STOP $COMMAND ${STOPARGS:-$ARGS} >>/tmp/stop.txt
 		if [ $? -ne 0 ]; then
 			ocf_log err "Error. $OCF_RESKEY_name script returned error $?."
 			exit $OCF_ERR_GENERIC
@@ -233,7 +277,7 @@ generic_script_validate_all()
 	return $OCF_SUCCESS
 }
 
-: ${OCF_RESKEY_state=${HA_RSCTMP}/generic-script-${OCF_RESOURCE_INSTANCE}.state}
+: ${OCF_RESKEY_state=${OCF_RESKEY_statedir:-$HA_RSCTMP}/generic-script-${OCF_RESOURCE_INSTANCE}.state}
 
 #
 # Main
